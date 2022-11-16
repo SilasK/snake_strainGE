@@ -1,0 +1,29 @@
+
+import pathlib
+
+
+# absolute path to snakemake dir
+snakemake_dir = Path(workflow.snakefile).parent.resolve()
+#sys.path.append(str(snakemake_dir/"scripts"))
+#import utils
+
+# include default config values
+configfile: f"{snakemake_dir}/config/default_config.yaml"
+
+
+include: "rules/sample_table.smk"
+include: "rules/strainGE.smk"
+include: "rules/strainGR.smk"
+
+
+rule all:
+    input:
+        "StrainGR_compare_finished"
+
+rule all_strainGST: 
+    input: 
+        "StrainGST.tsv"
+
+
+
+    
