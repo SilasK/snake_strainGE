@@ -7,7 +7,7 @@ rule prepare_fasta:
         strain_list = expand("Intermediate_files/StrainGST/{sample}.strains.tsv",sample=get_all_samples()),
         similarities= rules.kmersim.output,
         fna_dir= rules.preprare_strainge_db.output.dir,
-        metadata_file = rules.preprare_strainge_db.output.meta,
+        #metadata_file = rules.preprare_strainge_db.output.meta,
     output:
         "Intermediate_files/concatenated_detected_strains.fasta"
     log:
@@ -39,7 +39,7 @@ straingr prepare-ref
                         related, due to increased shared content.
 """
 
-
+"""
 rule minimap_index:
     input:
         target=rules.prepare_fasta.output,
@@ -73,15 +73,60 @@ rule map:
     wrapper:
         "v1.18.3/bio/minimap2/aligner"
 
+"""
+
+def get_bam_input(wildcards):
+
+    #  "atlas_analysis/sample/sequence_quality_control/sample_QC_se.fastq.gz"
+
+
+    #fastqs = get_reads(wildcards)
+
+    #atlas_dir = Path(fastqs[0]).parent.parent.parent
+    atlas_dir =Path("../atlas_analysis")
+
+    return atlas_dir / "genomes"/"alignments" / f"{wildcards.sample}.bam"
+
+
+rule get_contig_names:
+    input:
+        "Intermediate_files/concatenated_detected_strains.fasta"
+    output:
+        "Intermediate_files/concatenated_detected_strains.txt"
+    run:
+        with open(output[0],"w") as fout,  open(input[0]) as fin:
+            for line in fin:
+                if line[0]==">":
+                    contig_name=line[1:].strip().split()[0]
+                    fout.write(contig_name+' ')
+            
+
+rule get_sorted_bam:
+    input:
+        get_bam_input
+    output:
+        temp("Intermediate_files/StrainGR/bams/{sample}.full.bam")
+    shell:
+        "samtools sort {input} -o {output} "
+
+rule subset_bam:
+    input:
+        bam="Intermediate_files/StrainGR/bams/{sample}.full.bam",
+        bai = "Intermediate_files/StrainGR/bams/{sample}.full.bam.bai",
+        contig_list= rules.get_contig_names.output[0]
+    output:
+        temp("Intermediate_files/StrainGR/bams/{sample}.bam")
+    log:
+        "log/subset_bam/{sample}.log"
+    shell:
+        "samtools view -b {input.bam} $(cat {input.contig_list}) > {output[0]} 2> {log}"
 
 
 rule samtools_index:
     input:
-        "Intermediate_files/StrainGR/bams/{sample}.bam",
+        "{bamfile}.bam",
     output:
-        "Intermediate_files/StrainGR/bams/{sample}.bam.bai",
-    log:
-        "log/alignment/samtools_index/{sample}.log",
+        "{bamfile}.bam.bai",
     params:
         extra="",  # optional params string
     threads: 4  # This value - 1 will be sent to -@

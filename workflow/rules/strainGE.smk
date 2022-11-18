@@ -3,7 +3,7 @@
 ## Build DB
 
 
-checkpoint preprare_strainge_db:
+rule preprare_strainge_db:
     input:
         "ref_genomes/human_readable"
     output:
@@ -33,7 +33,8 @@ rule kmerize_genome:
 
 def kmersim_input(wildcards):
 
-    db_dir = Path(checkpoints.preprare_strainge_db.get().output.dir)
+    #db_dir = Path(checkpoints.preprare_strainge_db.get().output.dir)
+    db_dir = Path(rules.preprare_strainge_db.output.dir)
     genomes = glob_wildcards( db_dir /"{genome}.fa.gz").genome
     assert len(genomes) >0, f"No fa.gz files found in {db_dir}"
 
