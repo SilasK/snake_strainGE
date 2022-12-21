@@ -1,28 +1,42 @@
 
 
+rule download_genomes:
+    output:
+        directory("ref_genomes/{genus}")
+    conda:
+        "../envs/ncbi_download.yaml"
+    log:
+        "log/{genus}/download_ncbi.log"
+    threads:
+        4
+    shell:
+        " mkdir -p {output} ; "
+        " ncbi-genome-download bacteria -l complete -g {wildcards.genus} -H -F all -o {output} -P -p {threads} &> {log}"
+
+
 ## Build DB
 
 
 checkpoint preprare_strainge_db:
     input:
-        "ref_genomes/human_readable"
+        rules.download_genomes.output
     output:
-        dir=directory("strainge_db/fasta"),
-        meta = "strainge_db/fasta/references_meta.tsv"
+        dir=directory("strainge_db/{genus}/fasta"),
+        meta = "strainge_db/{genus}/fasta/references_meta.tsv"
     params:
         split_plasmids= True
     log:
-        "log/preprare_strainge_db.log"
+        "log/{genus}/preprare_strainge_db.log"
     script:
-        "scripts/prepare_strainge_db.py"
+        "../scripts/prepare_strainge_db.py"
         
 rule kmerize_genome:
     input:
-        "strainge_db/fasta/{genome}.fa.gz"
+        "strainge_db/{genus}/fasta/{genome}.fa.gz"
     output:
-        "strainge_db/hdf5/{genome}.hdf5"
+        "strainge_db/{genus}/hdf5/{genome}.hdf5"
     log:
-        "log/kmerize/{genome}.log"
+        "log/{genus}/kmerize/{genome}.log"
     resources:
         mem_mb=1000,
         time_min=20
@@ -33,19 +47,19 @@ rule kmerize_genome:
 
 def kmersim_input(wildcards):
 
-    db_dir = Path(checkpoints.preprare_strainge_db.get().output.dir)
+    db_dir = Path(checkpoints.preprare_strainge_db.get(**wildcards).output.dir)
     genomes = glob_wildcards( db_dir /"{genome}.fa.gz").genome
     assert len(genomes) >0, f"No fa.gz files found in {db_dir}"
 
-    return expand(rules.kmerize_genome.output,genome=genomes)    
+    return expand(rules.kmerize_genome.output,genome=genomes,**wildcards)    
 
 rule kmersim:
     input:
         kmersim_input
     output:
-        "strainge_db/similarities.tsv"
+        "strainge_db/{genus}/similarities.tsv"
     log:
-        "log/kmersim.log"
+        "log/{genus}/kmersim.log"
     threads:
         8
     shell:
@@ -59,9 +73,9 @@ rule cluster:
         similarities= rules.kmersim.output,
         hdf= kmersim_input
     output:
-        "strainge_db/references_to_keep.txt"
+        "strainge_db/{genus}/references_to_keep.txt"
     log:
-        "log/cluster.log"
+        "log/{genus}/cluster.log"
     shell:
         "straingst cluster -i {input.similarities} "
         " -d -C 0.99 -c 0.90 "
@@ -72,9 +86,9 @@ rule createdb:
     input:
         rules.cluster.output
     output:
-        protected("pan-genome-db.hdf5")
+        protected("{genus}-db.hdf5")
     log:
-        "log/createdb.log"
+        "log/{genus}/createdb.log"
     shell:
         "straingst createdb -f {input} -o {output} 2> {log}"
 
@@ -97,24 +111,26 @@ rule kmerize_sample:
 
 rule run_straingst:
     input:
-        db = "pan-genome-db.hdf5",
+        db = "{genus}-db.hdf5",
         sample = rules.kmerize_sample.output
     output:
-        "Intermediate_files/StrainGST/{sample}.stats.tsv",
-        "Intermediate_files/StrainGST/{sample}.strains.tsv"
+        "Intermediate_files/{genus}/StrainGST/{sample}.stats.tsv",
+        "Intermediate_files/{genus}/StrainGST/{sample}.strains.tsv"
+    params:
+        out_prefix= lambda wc,output: output[0].replace(".stats.tsv","")
     log:
-        "log/strainGST/{sample}.log"
+        "log/{genus}/strainGST/{sample}.log"
     shell:
         "straingst run "
-        " --separate-output -o Intermediate_files/StrainGST/{wildcards.sample}"
+        " --separate-output -o {params.out_prefix} "
         " {input.db} {input.sample} "
         " 2> {log}"
     
 rule combine_strainGST:
     input:
-        expand("Intermediate_files/StrainGST/{sample}.strains.tsv",sample=get_all_samples())
+        expand("Intermediate_files/{{genus}}/StrainGST/{sample}.strains.tsv",sample=get_all_samples())
     output:
-        "StrainGST.tsv"
+        "StrainGST_{genus}.tsv"
     params:
         sample_names = get_all_samples()
     run:

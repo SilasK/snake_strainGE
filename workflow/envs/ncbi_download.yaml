@@ -1,0 +1,7 @@
+channels:
+  - biobakery
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - ncbi-genome-download

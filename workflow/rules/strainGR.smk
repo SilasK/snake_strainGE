@@ -4,14 +4,14 @@
 
 rule prepare_fasta:
     input:
-        strain_list = expand("Intermediate_files/StrainGST/{sample}.strains.tsv",sample=get_all_samples()),
+        strain_list = expand("Intermediate_files/{{genus}}/StrainGST/{sample}.strains.tsv",sample=get_all_samples()),
         similarities= rules.kmersim.output,
         fna_dir= rules.preprare_strainge_db.output.dir,
         metadata_file = rules.preprare_strainge_db.output.meta,
     output:
-        "Intermediate_files/concatenated_detected_strains.fasta"
+        "Intermediate_files/{genus}/concatenated_detected_strains.fasta"
     log:
-        "log/strainGR/prepare_fasta_for_mapping.log"
+        "log/{genus}/strainGR/prepare_fasta_for_mapping.log"
     shell:
         "straingr prepare-ref "
         " -s {input.strain_list} "
@@ -40,48 +40,48 @@ straingr prepare-ref
 """
 
 
-rule minimap_index:
-    input:
-        target=rules.prepare_fasta.output,
-    output:
-        "Intermediate_files/StrainGR/detected_strains.mmi",
-    log:
-        "log/alignment/index.log",
-    #params:
-        #index_size="33G",
-    threads: 6
-    wrapper:
-        "v1.18.3/bio/minimap2/index"
 
+rule bwa_mem2_index:
+    input:
+        rules.prepare_fasta.output
+    output:
+        multiext("Intermediate_files/{genus}/StrainGR/detected_strains",".0123",
+        ".amb",
+        ".ann",
+        ".bwt.2bit.64",
+        ".pac",)
+    log:
+        "log/{genus}/alignment/bwa_index.log",
+    wrapper:
+        "v1.19.1/bio/bwa-mem2/index"
 
 
 rule map:
     input:
-        target=rules.minimap_index.output,
-        query=get_reads,
+        reads=get_reads,
+        idx=rules.bwa_mem2_index.output,
     output:
-        "Intermediate_files/StrainGR/bams/{sample}.bam",
+        "Intermediate_files/{genus}/StrainGR/bams/{sample}.bam",
     log:
-        "log/alignment/minimap/{sample}.log",
+        "log/{genus}/alignment/minimap/{sample}.log",
     params:
-        extra="-x sr",
-        sort="coordinate",
-    threads: config["threads"]
-    # resources:
-    #     mem=config["mem"],
-    #     mem_mb=config["mem"] * 1000,
+        extra=r"-R '@RG\tID:{sample}\tSM:{sample}' -I 300 ", # define insert size
+        sort="samtools",  # Can be 'none', 'samtools' or 'picard'.
+        sort_order="coordinate",  # Can be 'coordinate' (default) or 'queryname'.
+        sort_extra="",  # Extra args for samtools/picard.
+    threads: 8
     wrapper:
-        "v1.18.3/bio/minimap2/aligner"
+        "v1.19.1/bio/bwa-mem2/mem"
 
 
 
 rule samtools_index:
     input:
-        "Intermediate_files/StrainGR/bams/{sample}.bam",
+        "Intermediate_files/{genus}/StrainGR/bams/{sample}.bam",
     output:
-        "Intermediate_files/StrainGR/bams/{sample}.bam.bai",
+        "Intermediate_files/{genus}/StrainGR/bams/{sample}.bam.bai",
     log:
-        "log/alignment/samtools_index/{sample}.log",
+        "log/{genus}/alignment/samtools_index/{sample}.log",
     params:
         extra="",  # optional params string
     threads: 4  # This value - 1 will be sent to -@
@@ -93,13 +93,13 @@ rule samtools_index:
 rule straingr_call:
     input:
         fasta= rules.prepare_fasta.output,
-        bam = "Intermediate_files/StrainGR/bams/{sample}.bam", #rules.map.output,
-        bai = "Intermediate_files/StrainGR/bams/{sample}.bam.bai" #rules.samtools_index.output
+        bam = "Intermediate_files/{genus}/StrainGR/bams/{sample}.bam", #rules.map.output,
+        bai = "Intermediate_files/{genus}/StrainGR/bams/{sample}.bam.bai" #rules.samtools_index.output
     output:
-        hdf="Intermediate_files/StrainGR/hdf/{sample}.hdf5",
-        summary="Intermediate_files/StrainGR/summary/{sample}.tsv"
+        hdf="Intermediate_files/{genus}/StrainGR/hdf/{sample}.hdf5",
+        summary="Intermediate_files/{genus}/StrainGR/summary/{sample}.tsv"
     log:
-        "log/StrainGR/call/{sample}.log"
+        "log/{genus}/StrainGR/call/{sample}.log"
     shell:
         "straingr call "
         " {input.fasta} {input.bam} "
@@ -111,9 +111,9 @@ rule straingr_call:
 
 checkpoint all_strainGR:
     input:
-        expand("Intermediate_files/StrainGR/summary/{sample}.tsv", sample= get_all_samples()),
+        expand("Intermediate_files/{{genus}}/StrainGR/summary/{sample}.tsv", sample= get_all_samples()),
     output:
-        touch("Intermediate_files/StrainGR/all_finished")
+        touch("Intermediate_files/{genus}/StrainGR/all_finished")
 
 
 
@@ -122,13 +122,13 @@ checkpoint all_strainGR:
 # compare two samples
 rule straingr_compare:
     input:
-        sampleA="Intermediate_files/StrainGR/hdf/{sampleA}.hdf5",
-        sampleB="Intermediate_files/StrainGR/hdf/{sampleB}.hdf5"
+        sampleA="Intermediate_files/{genus}/StrainGR/hdf/{sampleA}.hdf5",
+        sampleB="Intermediate_files/{genus}/StrainGR/hdf/{sampleB}.hdf5"
     output:
-        summary="Intermediate_files/StrainGR/comparisons/summary/{sampleA}_{sampleB}_summary.tsv",
-        details = "Intermediate_files/StrainGR/comparisons/details/{sampleA}_{sampleB}_details.tsv"
+        summary="Intermediate_files/{genus}/StrainGR/comparisons/summary/{sampleA}_{sampleB}_summary.tsv",
+        details = "Intermediate_files/{genus}/StrainGR/comparisons/details/{sampleA}_{sampleB}_details.tsv"
     log:
-        "log/StrainGR/compare/{sampleA}_{sampleB}.log"
+        "log/{genus}/StrainGR/compare/{sampleA}_{sampleB}.log"
     threads:
         1
     resources:
@@ -164,7 +164,7 @@ rule combine_strainGR:
         flag=get_flag ,
         comparisons= get_all_comparisons
     output:
-        touch("StrainGR_compare_finished")
+        touch("StrainGR_compare_{genus}_finished")
 
 """
 

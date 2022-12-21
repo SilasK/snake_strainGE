@@ -18,3 +18,7 @@ for f in strainge_db/*.fa.gz; do straingst kmerize -o ${f%.fa.gz}.hdf5 $f; done;
 
 
 mamba install -y mummer 
+
+
+pysam error 
+mamba install pysam=0.19

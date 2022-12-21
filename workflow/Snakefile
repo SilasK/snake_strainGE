@@ -16,14 +16,14 @@ include: "rules/strainGE.smk"
 include: "rules/strainGR.smk"
 
 
-rule all:
-    input:
-        "StrainGR_compare_finished"
+
 
 rule all_strainGST: 
     input: 
-        "StrainGST.tsv"
+        expand("StrainGST_{genus}.tsv", genus=["Moraxella","Haemophilus"])
 
 
-
+rule all:
+    input:
+        "StrainGR_compare_{genus}_finished"
     
