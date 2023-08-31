@@ -20,7 +20,9 @@ include: "rules/strainGR.smk"
 
 rule all_strainGST: 
     input: 
-        expand("StrainGST_{genus}.tsv", genus=["Moraxella","Haemophilus"])
+        expand("StrainGST_{genus}.tsv", genus=["Moraxella","Haemophilus"]),
+        expand("Intermediate_files/{genus}/StrainGR/all_finished", genus=["Moraxella","Haemophilus"]),
+        
 
 
 rule all:
