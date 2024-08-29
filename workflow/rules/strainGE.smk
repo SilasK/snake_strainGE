@@ -42,6 +42,8 @@ rule kmerize_genome:
         time_min=20
     threads:
         1
+    conda:
+        "../envs/strainge.yaml"
     shell:
         "straingst kmerize -o {output} {input} &> {log}"
 
@@ -62,6 +64,8 @@ rule kmersim:
         "log/{genus}/kmersim.log"
     threads:
         8
+    conda:
+        "../envs/strainge.yaml"
     shell:
         "straingst kmersim "
         " --all-vs-all -t {threads} "
@@ -76,6 +80,8 @@ rule cluster:
         "strainge_db/{genus}/references_to_keep.txt"
     log:
         "log/{genus}/cluster.log"
+    conda:
+        "../envs/strainge.yaml"
     shell:
         "straingst cluster -i {input.similarities} "
         " -d -C 0.99 -c 0.90 "
@@ -89,6 +95,8 @@ rule createdb:
         protected("{genus}-db.hdf5")
     log:
         "log/{genus}/createdb.log"
+    conda:
+        "../envs/strainge.yaml"
     shell:
         "straingst createdb -f {input} -o {output} 2> {log}"
 
@@ -103,6 +111,8 @@ rule kmerize_sample:
         "samples/{sample}.hdf5"
     log:
         "log/kmerize_sample/{sample}.log"
+    conda:
+        "../envs/strainge.yaml"
     shell:
         "straingst kmerize -k 23 "
         " -o {output} "
@@ -120,6 +130,8 @@ rule run_straingst:
         out_prefix= lambda wc,output: output[0].replace(".stats.tsv","")
     log:
         "log/{genus}/strainGST/{sample}.log"
+    conda:
+        "../envs/strainge.yaml"
     shell:
         "straingst run "
         " --separate-output -o {params.out_prefix} "

@@ -12,6 +12,8 @@ rule prepare_fasta:
         "Intermediate_files/{genus}/concatenated_detected_strains.fasta"
     log:
         "log/{genus}/strainGR/prepare_fasta_for_mapping.log"
+    conda:
+        "../envs/strainge.yaml"
     shell:
         "straingr prepare-ref "
         " -s {input.strain_list} "
@@ -100,6 +102,8 @@ rule straingr_call:
         summary="Intermediate_files/{genus}/StrainGR/summary/{sample}.tsv"
     log:
         "log/{genus}/StrainGR/call/{sample}.log"
+    conda:
+        "../envs/strainge.yaml"
     shell:
         "straingr call "
         " {input.fasta} {input.bam} "
@@ -133,6 +137,8 @@ rule straingr_compare:
         1
     resources:
         mem_mb=40 *1000
+    conda:
+        "../envs/strainge.yaml"
     shell:
         "straingr compare "
         " {input} "
